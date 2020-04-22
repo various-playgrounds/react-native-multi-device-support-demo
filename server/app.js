@@ -1,14 +1,31 @@
 const http = require('http');
+const AWS = require('aws-sdk');
 
-const hostname = '127.0.0.1';
-const port = 3000;
+AWS.config.update({
+    endpoint: `http://localhost:8000`
+});
+dynamoClient = new AWS.DynamoDB.DocumentClient();
 
-const server = http.createServer((req, res) => {
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'text/plain');
-  res.end('Hello World');
+const express = require('express')
+const app = express()
+const bodyParser = require('body-parser');
+app.use(bodyParser.raw());
+app.use(bodyParser.json()); // support json encoded bodies
+app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
+
+const port = 3000
+
+app.get('/', (req, res) => res.send('Hello World!'))
+
+// Access the parse results as request.body
+app.post('/operation', function(request, response){
+    console.log(request.body.operation);
+    console.log(request.body.delta);
+    console.log(request.body.version);
 });
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}/`);
-});
+app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`))
+
+
+
+
