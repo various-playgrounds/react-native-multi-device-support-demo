@@ -1,12 +1,13 @@
 # GET http://localhost:3000 HTTP/1.1
 
+GET http://localhost:3000/current_state HTTP/1.1
 
-POST http://localhost:3000/operation HTTP/1.1
-Content-Type: application/json
+# POST http://localhost:3000/operation HTTP/1.1
+# Content-Type: application/json
 
-{
-    "id": "2",
-    "version": 0
-}
+# {
+#     "id": "2",
+#     "version": 0
+# }
 
 # "{"operation": "add","delta": 100,"version": 1}"

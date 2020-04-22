@@ -18,6 +18,17 @@ const port = 3000
 
 app.get('/', (req, res) => res.send('Hello World!'))
 
+app.get('/current_state', async (req, response) => {
+    const resp = await dynamoClient.get({
+        TableName: 'ct152',
+        Key: {
+            pk: 'userId#1'
+        },
+        ConsistentRead: true
+    }).promise();
+    response.json(resp.Item);
+})
+
 // Access the parse results as request.body
 app.post('/operation', async function(request, response){
     console.log(request.body.id);
@@ -45,7 +56,8 @@ app.post('/operation', async function(request, response){
             ReturnValues: "UPDATED_NEW"
         }).promise();
         response.json({
-            succeeded: true
+            succeeded: true,
+            recordToSync: resp
         });
     } catch (err) {
         if (err.code === 'ConditionalCheckFailedException') {
