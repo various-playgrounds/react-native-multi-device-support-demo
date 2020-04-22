@@ -3,9 +3,6 @@ var params = {
     Key: {
         pk: 'userId#1'
     },
-    AttributesToGet: [
-        'count'
-    ],
     ConsistentRead: true
 };
 docClient.get(params, function(err, data) {
