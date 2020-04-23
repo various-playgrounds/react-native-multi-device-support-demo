@@ -29,10 +29,7 @@ app.get('/current_state', async (req, response) => {
     response.json(resp.Item);
 })
 
-// Access the parse results as request.body
 app.post('/operation', async function(request, response){
-    console.log(request.body.id);
-    console.log(request.body.version);
     try {
         const resp = await dynamoClient.update({
             TableName: 'ct152',
@@ -40,17 +37,17 @@ app.post('/operation', async function(request, response){
                 pk: 'userId#1'
             },
             UpdateExpression: `
-              set exercises.#attr = :finished
+              set exercises = :exercises
               ADD version :inc
             `,
-            ConditionExpression: '#version <= :version and attribute_not_exists(exercises.#attr)',
+            ConditionExpression: '#version < :version',
             ExpressionAttributeNames: {
                 '#attr' : request.body.id,
                 '#version': 'version'
             },
             ExpressionAttributeValues: {
                 ':inc': 1,
-                ':finished': 'completed',
+                ':exercises': request.body.exercises,
                 ':version': request.body.version
             },
             ReturnValues: "UPDATED_NEW"

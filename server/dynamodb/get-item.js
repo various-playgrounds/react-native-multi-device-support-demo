@@ -6,6 +6,6 @@ var params = {
     ConsistentRead: true
 };
 docClient.get(params, function(err, data) {
-    if (err) ppJson(err); // an error occurred
-    else ppJson(data); // successful response
+    if (err) ppJson(err);
+    else ppJson(data);
 });

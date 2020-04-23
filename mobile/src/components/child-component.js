@@ -44,8 +44,12 @@ export default class ChildComponent extends Component {
         try {
             const response = await fetch('http://192.168.86.105:3000/current_state');
             const state = await response.json();
+            const serverExercises = {};
+            state.exercises.forEach((item) => {
+                serverExercises[item] = 'completed'
+            })
             this.setState({
-                exercises: state.exercises,
+                exercises: serverExercises,
                 version: state.version
             });
         } catch (e) {
@@ -55,16 +59,22 @@ export default class ChildComponent extends Component {
 
     onSubmit = async () => {
         console.log('hit submit button');
+        const newVersion = this.state.version + 1;
+        const updatedExercises = Object.assign({}, this.state.exercises, {[this.state.exerciseInput]: 'completed'});
+        await this._postExercisesToServer.call(this, updatedExercises, newVersion);
+    }
+
+    _postExercisesToServer = async (updatedExercises, newVersion) => {
         try {
             const response = await fetch('http://192.168.86.105:3000/operation', {
                 method: 'POST',
                 body: JSON.stringify({
-                    id: this.state.exerciseInput,
-                    version: this.state.version
+                    exercises: Object.keys(updatedExercises),
+                    version: newVersion
                 }),
-                mode: 'cors', // no-cors, *cors, same-origin
-                cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
-                credentials: 'same-origin', // include, *same-origin, omit
+                mode: 'cors',
+                cache: 'no-cache',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -73,12 +83,34 @@ export default class ChildComponent extends Component {
             if (state.succeeded) {
                 console.log('succeed');
                 console.log('the state is successful');
+                const newExercises = {};
+                state.recordToSync.Attributes.exercises.forEach((item) => {
+                    newExercises[item] = 'completed';
+                });
                 this.setState({
-                    exercises: state.recordToSync.Attributes.exercises,
+                    exercises: newExercises,
                     version: state.recordToSync.Attributes.version
                 });
             } else {
-                alert(`error submitting: ${JSON.stringify(state)}`);
+                const serverVersion = state.recordToSync.Item.version;
+                const serverExercises = state.recordToSync.Item.exercises;
+                const newUpdatedExercises = {};
+                serverExercises.forEach((item) => {
+                    newUpdatedExercises[item] = 'completed';
+                });
+                const clientExercises = this.state.exercises;
+                Object.keys(clientExercises).forEach((item) => {
+                    if (!newUpdatedExercises[item]) {
+                        newUpdatedExercises[item] = 'completed';
+                    }
+                });
+
+                const newExercise = this.state.exerciseInput;
+                if (!newUpdatedExercises[newExercise]) {
+                    newUpdatedExercises[newExercise] = 'completed';
+                }
+                const updatedVersion = serverVersion + 1;
+                await this._postExercisesToServer.call(this, newUpdatedExercises, updatedVersion);
             }
         } catch (e) {
             console.log(e);
