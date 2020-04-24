@@ -20,7 +20,7 @@ export default class ChildComponent extends Component {
                     color="#841584"
                 />
 
-                <Text>Mock exercise to be completed</Text>
+                <Text>Add exercise to be finished below</Text>
                 <TextInput
                     onChangeText={text => this.setState({
                         exerciseInput: text
