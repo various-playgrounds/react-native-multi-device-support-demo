@@ -1,4 +1,3 @@
-const http = require('http');
 const AWS = require('aws-sdk');
 
 AWS.config.update({
@@ -37,24 +36,23 @@ app.post('/operation', async function(request, response){
                 pk: 'userId#1'
             },
             UpdateExpression: `
-              set exercises = :exercises
-              ADD version :inc
+              set exercises.#exerciseNum = :completed
+              ADD versions.exercises.#exerciseNum :inc
             `,
-            ConditionExpression: '#version < :version',
+            ConditionExpression: 'versions.exercises.#exerciseNum < :version',
             ExpressionAttributeNames: {
-                '#attr' : request.body.id,
-                '#version': 'version'
+                '#exerciseNum': request.body.exercise,
             },
             ExpressionAttributeValues: {
                 ':inc': 1,
-                ':exercises': request.body.exercises,
-                ':version': request.body.version
+                ':version': request.body.version,
+                ':completed': 'completed' 
             },
             ReturnValues: "UPDATED_NEW"
         }).promise();
         response.json({
             succeeded: true,
-            recordToSync: resp
+            recordToSync: resp.Attributes
         });
     } catch (err) {
         if (err.code === 'ConditionalCheckFailedException') {
@@ -68,7 +66,7 @@ app.post('/operation', async function(request, response){
             }).promise();
             response.json({
                 succeeded: false,
-                recordToSync: resp
+                recordToSync: resp.Item
             });
         }
     }
