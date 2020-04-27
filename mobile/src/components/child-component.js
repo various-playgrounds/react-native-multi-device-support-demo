@@ -5,14 +5,12 @@ export default class ChildComponent extends Component {
         super(props);
         this.state = {
             exercises: {},
-            version: 0,
             exerciseInput: 'placeholder'
         };
     }
     render() {
         return (
             <View>
-                <Text>current version: {this.state.version}</Text>
                 <Text>current exercises: {JSON.stringify(this.state.exercises)}</Text>
                 <Button
                     onPress={this.onSyncUp}
@@ -45,12 +43,14 @@ export default class ChildComponent extends Component {
             const response = await fetch('http://192.168.86.105:3000/current_state');
             const state = await response.json();
             const serverExercises = {};
-            state.exercises.forEach((item) => {
-                serverExercises[item] = 'completed'
-            })
+            Object.keys(state.exercises).forEach((item) => {
+                serverExercises[item] = {
+                    completed: true,
+                    version: state.versions.exercises[item]
+                }
+            });
             this.setState({
-                exercises: serverExercises,
-                version: state.version
+                exercises: serverExercises
             });
         } catch (e) {
             console.log(e);
@@ -58,18 +58,25 @@ export default class ChildComponent extends Component {
     }
 
     onSubmit = async () => {
-        console.log('hit submit button');
-        const newVersion = this.state.version + 1;
-        const updatedExercises = Object.assign({}, this.state.exercises, {[this.state.exerciseInput]: 'completed'});
-        await this._postExercisesToServer.call(this, updatedExercises, newVersion);
+        const latestExercises = Object.assign({}, this.state.exercises);
+        if (this.state.exercises[this.state.exerciseInput]) {
+            latestExercises[this.state.exerciseInput].version = this.state.exercises[this.state.exerciseInput].version + 1
+        } else {
+            latestExercises[this.state.exerciseInput] = {
+                version: 1,
+                completed: true
+            };
+        }
+        const newVersion = latestExercises[this.state.exerciseInput].version;
+        await this._postExercisesToServer.call(this, this.state.exerciseInput, newVersion, latestExercises);
     }
 
-    _postExercisesToServer = async (updatedExercises, newVersion) => {
+    _postExercisesToServer = async (exerciseNumber, newVersion, latestExercises) => {
         try {
             const response = await fetch('http://192.168.86.105:3000/operation', {
                 method: 'POST',
                 body: JSON.stringify({
-                    exercises: Object.keys(updatedExercises),
+                    exercise: exerciseNumber,
                     version: newVersion
                 }),
                 mode: 'cors',
@@ -80,42 +87,57 @@ export default class ChildComponent extends Component {
                 },
             });
             const state = await response.json();
+            const serverExercises = state.recordToSync.exercises;
+            const serverExercisesVersions = state.recordToSync.versions.exercises;
+            const newUpdatedExercises = this.mergeServerClientExercises(serverExercises, serverExercisesVersions);
+
             if (state.succeeded) {
-                console.log('succeed');
-                console.log('the state is successful');
-                const newExercises = {};
-                state.recordToSync.Attributes.exercises.forEach((item) => {
-                    newExercises[item] = 'completed';
-                });
                 this.setState({
-                    exercises: newExercises,
-                    version: state.recordToSync.Attributes.version
+                    exercises: newUpdatedExercises
                 });
             } else {
-                const serverVersion = state.recordToSync.Item.version;
-                const serverExercises = state.recordToSync.Item.exercises;
-                const newUpdatedExercises = {};
-                serverExercises.forEach((item) => {
-                    newUpdatedExercises[item] = 'completed';
-                });
-                const clientExercises = this.state.exercises;
-                Object.keys(clientExercises).forEach((item) => {
-                    if (!newUpdatedExercises[item]) {
-                        newUpdatedExercises[item] = 'completed';
-                    }
-                });
-
-                const newExercise = this.state.exerciseInput;
-                if (!newUpdatedExercises[newExercise]) {
-                    newUpdatedExercises[newExercise] = 'completed';
-                }
-                const updatedVersion = serverVersion + 1;
-                await this._postExercisesToServer.call(this, newUpdatedExercises, updatedVersion);
+                newUpdatedExercises[exerciseNumber].version += 1
+                const updatedVersion = newUpdatedExercises[exerciseNumber].version;
+                await this._postExercisesToServer.call(this, exerciseNumber, updatedVersion, newUpdatedExercises);
             }
         } catch (e) {
             console.log(e);
             console.log('error submitting new exercise');
         }
+    }
+
+    mergeServerClientExercises = (serverExercises, serverExercisesVersions) => {
+        const newUpdatedExercises = {};
+
+        // sync server exercises
+        Object.keys(serverExercises).forEach((item) => {
+            newUpdatedExercises[item] = {
+                completed: true,
+                version: serverExercisesVersions[item]
+            };
+        });
+
+        // sync client exercises
+        const clientExercises = this.state.exercises;
+        Object.keys(clientExercises).forEach((item) => {
+            if (!newUpdatedExercises[item]) {
+                newUpdatedExercises[item] = {
+                    completed: true,
+                    version: item.version
+                }
+            }
+        });
+
+        // sync new exercise to be submitted
+        const newExercise = this.state.exerciseInput;
+        if (!newUpdatedExercises[newExercise]) {
+            newUpdatedExercises[newExercise] = {
+                completed: true,
+                version: 0
+            }
+        }
+
+        return newUpdatedExercises;
     }
 
     async componentDidMount() {
