@@ -2,8 +2,34 @@ var params = {
     TableName: 'ct152',
     Item: {
         pk: 'userId#1',
-        exercises: {},
-        version: 0
+        exercises: {
+            1: {
+                rounds: {
+                    0: {
+                        "version": 0
+                    },
+                    1: {
+                        "version": 0
+                    },
+                    2: {
+                        "version": 0
+                    }
+                }
+            },
+            2: {
+                rounds: {
+                    0: {
+                        "version": 0
+                    },
+                    1: {
+                        "version": 0
+                    },
+                    2: {
+                        "version": 0
+                    }
+                }
+            }
+        }
     },
     ReturnValues: 'NONE',
     ReturnConsumedCapacity: 'NONE'

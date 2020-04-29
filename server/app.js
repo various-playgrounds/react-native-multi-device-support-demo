@@ -1,5 +1,6 @@
 const http = require('http');
 const AWS = require('aws-sdk');
+const moment = require('moment')
 
 AWS.config.update({
     endpoint: `http://localhost:8000`,
@@ -37,18 +38,23 @@ app.post('/operation', async function(request, response){
                 pk: 'userId#1'
             },
             UpdateExpression: `
-              set exercises = :exercises
-              ADD version :inc
+              set exercises.#exercise.rounds.#round.completed = :completed,
+                  exercises.#exercise.rounds.#round.updatedAt = :updatedAt,
+                  exercises.#exercise.updatedAt = :updatedAt,
+                  updatedAt = :updatedAt
+              ADD exercises.#exercise.rounds.#round.#version :inc
             `,
-            ConditionExpression: '#version < :version',
+            ConditionExpression: 'exercises.#exercise.rounds.#round.#version < :version',
             ExpressionAttributeNames: {
-                '#attr' : request.body.id,
-                '#version': 'version'
+                '#version': 'version',
+                '#round': request.body.round,
+                '#exercise': request.body.exercise
             },
             ExpressionAttributeValues: {
                 ':inc': 1,
-                ':exercises': request.body.exercises,
-                ':version': request.body.version
+                ':completed': true,
+                ':version': request.body.version,
+                ':updatedAt': moment().format()
             },
             ReturnValues: "UPDATED_NEW"
         }).promise();
@@ -57,6 +63,7 @@ app.post('/operation', async function(request, response){
             recordToSync: resp
         });
     } catch (err) {
+        console.log(err.message);
         if (err.code === 'ConditionalCheckFailedException') {
             console.log('The progress is not in-synced, return update-to-date record to client first');
             const resp = await dynamoClient.get({
