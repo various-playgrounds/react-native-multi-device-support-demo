@@ -28,45 +28,63 @@ app.get('/current_state', async (req, response) => {
     response.json(resp.Item);
 })
 
-app.post('/operation', async function(request, response){
+app.post('/swap_device', async function(request, response) {
     try {
-        const resp = await dynamoClient.update({
+        await dynamoClient.update({
             TableName: 'ct152',
             Key: {
                 pk: 'userId#1'
             },
             UpdateExpression: `
-              set exercises.#exerciseNum = :completed
-              ADD versions.exercises.#exerciseNum :inc
+              set exercises.#exercise = :completed, deviceId = :deviceId
             `,
-            ConditionExpression: 'versions.exercises.#exerciseNum < :version',
             ExpressionAttributeNames: {
-                '#exerciseNum': request.body.exercise,
+                '#exercise': request.body.exercise
             },
             ExpressionAttributeValues: {
-                ':inc': 1,
-                ':version': request.body.version,
-                ':completed': 'completed' 
+                ':completed': 'completed',
+                ':deviceId': request.body.deviceId 
             },
             ReturnValues: "UPDATED_NEW"
         }).promise();
         response.json({
-            succeeded: true,
-            recordToSync: resp.Attributes
+            succeeded: true
+        });
+    } catch (e) {
+        response.json({
+            succeeded: false
+        });
+    }
+});
+
+app.post('/operation', async function(request, response){
+    try {
+        await dynamoClient.update({
+            TableName: 'ct152',
+            Key: {
+                pk: 'userId#1'
+            },
+            UpdateExpression: `
+              set exercises.#exercise = :completed, deviceId = :deviceId
+            `,
+            ConditionExpression: 'attribute_not_exists(deviceId) OR deviceId = :deviceId',
+            ExpressionAttributeNames: {
+                '#exercise': request.body.exercise
+            },
+            ExpressionAttributeValues: {
+                ':completed': 'completed',
+                ':deviceId': request.body.deviceId 
+            },
+            ReturnValues: "NONE"
+        }).promise();
+        response.json({
+            succeeded: true
         });
     } catch (err) {
         if (err.code === 'ConditionalCheckFailedException') {
-            console.log('The progress is not in-synced, return update-to-date record to client first');
-            const resp = await dynamoClient.get({
-                TableName: 'ct152',
-                Key: {
-                    pk: 'userId#1'
-                },
-                ConsistentRead: true
-            }).promise();
+            console.log('The device is not active, ask to log in first');
             response.json({
-                succeeded: false,
-                recordToSync: resp.Item
+                succeeded: false
             });
         }
     }

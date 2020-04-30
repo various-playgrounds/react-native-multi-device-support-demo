@@ -1,11 +1,13 @@
 import React, { Component } from 'react';
-import { View, Text, Button, TextInput } from 'react-native';
+import Constants from 'expo-constants';
+import { View, Text, Button, TextInput,  Modal, TouchableHighlight, Alert } from 'react-native';
 export default class ChildComponent extends Component {
     constructor(props) {
         super(props);
         this.state = {
             exercises: {},
-            exerciseInput: 'placeholder'
+            exerciseInput: 'placeholder',
+            modalVisible: false
         };
     }
     render() {
@@ -34,8 +36,68 @@ export default class ChildComponent extends Component {
                     title="submit new exercise"
                     color="#841584"
                 />
+
+                <Modal
+                    animationType="slide"
+                    transparent={false}
+                    visible={this.state.modalVisible}
+                    onRequestClose={() => {
+                    Alert.alert('Modal has been closed.');
+                    }}>
+                    <View style={{ marginTop: 60 }}>
+                        <Text style={{ fontWeight: 'bold' }}>You seemed to have another active device in use before, do you want to switch to current one? Notice you might lose unsynced progress on the first device</Text>
+
+                        <TouchableHighlight
+                          style={{ marginTop: 40 }}
+                          onPress={this.switch}
+                        >
+                            <Text>Yes! I want to switch</Text>
+                        </TouchableHighlight>
+
+                        <TouchableHighlight
+                          style={{ marginTop: 40 }}
+                          onPress={this.noSwitch}
+                        >
+                            <Text>No! I want to keep using the previous one</Text>
+                        </TouchableHighlight>
+                    </View>
+                </Modal>
             </View>
         );
+    }
+
+    switch = async () => {
+        try {
+            await fetch('http://192.168.86.105:3000/swap_device', {
+                method: 'POST',
+                body: JSON.stringify({
+                    exercise: this.state.exerciseInput,
+                    deviceId: Constants.installationId
+                }),
+                mode: 'cors',
+                cache: 'no-cache',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+            });
+            this.onSyncUp();
+            this.setState({
+                modalVisible: false
+            });
+        } catch (e) {
+            console.log(e);
+        }
+    }
+
+    noSwitch = () => {
+        this.setModalVisible(!this.state.modalVisible);
+    }
+
+    setModalVisible = (modalVisible) => {
+        this.setState({
+            modalVisible
+        })
     }
 
     onSyncUp = async () => {
@@ -44,10 +106,7 @@ export default class ChildComponent extends Component {
             const state = await response.json();
             const serverExercises = {};
             Object.keys(state.exercises).forEach((item) => {
-                serverExercises[item] = {
-                    completed: true,
-                    version: state.versions.exercises[item]
-                }
+                serverExercises[item] = true
             });
             this.setState({
                 exercises: serverExercises
@@ -58,26 +117,16 @@ export default class ChildComponent extends Component {
     }
 
     onSubmit = async () => {
-        const latestExercises = Object.assign({}, this.state.exercises);
-        if (this.state.exercises[this.state.exerciseInput]) {
-            latestExercises[this.state.exerciseInput].version = this.state.exercises[this.state.exerciseInput].version + 1
-        } else {
-            latestExercises[this.state.exerciseInput] = {
-                version: 1,
-                completed: true
-            };
-        }
-        const newVersion = latestExercises[this.state.exerciseInput].version;
-        await this._postExercisesToServer.call(this, this.state.exerciseInput, newVersion, latestExercises);
+        await this._postExercisesToServer.call(this, this.state.exerciseInput);
     }
 
-    _postExercisesToServer = async (exerciseNumber, newVersion, latestExercises) => {
+    _postExercisesToServer = async (exerciseNumber) => {
         try {
             const response = await fetch('http://192.168.86.105:3000/operation', {
                 method: 'POST',
                 body: JSON.stringify({
                     exercise: exerciseNumber,
-                    version: newVersion
+                    deviceId: Constants.installationId
                 }),
                 mode: 'cors',
                 cache: 'no-cache',
@@ -87,57 +136,25 @@ export default class ChildComponent extends Component {
                 },
             });
             const state = await response.json();
-            const serverExercises = state.recordToSync.exercises;
-            const serverExercisesVersions = state.recordToSync.versions.exercises;
-            const newUpdatedExercises = this.mergeServerClientExercises(serverExercises, serverExercisesVersions);
 
             if (state.succeeded) {
+                // same device, able to post progress to backend
+                this.onSyncUp();
+                const latestExercises = Object.assign({}, this.state.exercises);
+                latestExercises[this.state.exerciseInput] = true
                 this.setState({
-                    exercises: newUpdatedExercises
+                    exercises: latestExercises
                 });
             } else {
-                newUpdatedExercises[exerciseNumber].version += 1
-                const updatedVersion = newUpdatedExercises[exerciseNumber].version;
-                await this._postExercisesToServer.call(this, exerciseNumber, updatedVersion, newUpdatedExercises);
+                console.log('different device, show pop up to confirm');
+                this.setState({
+                    modalVisible: true
+                });
             }
         } catch (e) {
             console.log(e);
             console.log('error submitting new exercise');
         }
-    }
-
-    mergeServerClientExercises = (serverExercises, serverExercisesVersions) => {
-        const newUpdatedExercises = {};
-
-        // sync server exercises
-        Object.keys(serverExercises).forEach((item) => {
-            newUpdatedExercises[item] = {
-                completed: true,
-                version: serverExercisesVersions[item]
-            };
-        });
-
-        // sync client exercises
-        const clientExercises = this.state.exercises;
-        Object.keys(clientExercises).forEach((item) => {
-            if (!newUpdatedExercises[item]) {
-                newUpdatedExercises[item] = {
-                    completed: true,
-                    version: item.version
-                }
-            }
-        });
-
-        // sync new exercise to be submitted
-        const newExercise = this.state.exerciseInput;
-        if (!newUpdatedExercises[newExercise]) {
-            newUpdatedExercises[newExercise] = {
-                completed: true,
-                version: 0
-            }
-        }
-
-        return newUpdatedExercises;
     }
 
     async componentDidMount() {
