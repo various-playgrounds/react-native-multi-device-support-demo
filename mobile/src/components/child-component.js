@@ -66,34 +66,6 @@ export default class ChildComponent extends Component {
         );
     }
 
-    switch = async () => {
-        try {
-            await fetch('http://192.168.86.105:3000/swap_device', {
-                method: 'POST',
-                body: JSON.stringify({
-                    exercise: this.state.exerciseInput,
-                    deviceId: Constants.installationId
-                }),
-                mode: 'cors',
-                cache: 'no-cache',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-            });
-            this.onSyncUp();
-            this.setState({
-                modalVisible: false
-            });
-        } catch (e) {
-            console.log(e);
-        }
-    }
-
-    noSwitch = () => {
-        this.setModalVisible(!this.state.modalVisible);
-    }
-
     setModalVisible = (modalVisible) => {
         this.setState({
             modalVisible
@@ -112,7 +84,7 @@ export default class ChildComponent extends Component {
                 exercises: serverExercises
             });
         } catch (e) {
-            console.log(e);
+            console.log(e.message);
         }
     }
 
@@ -146,18 +118,53 @@ export default class ChildComponent extends Component {
                     exercises: latestExercises
                 });
             } else {
-                console.log('different device, show pop up to confirm');
+                // different device, show modal to confirm
                 this.setState({
                     modalVisible: true
                 });
+                this._lastDeviceId = state.lastDeviceId;
             }
         } catch (e) {
-            console.log(e);
-            console.log('error submitting new exercise');
+            console.log(e.message);
         }
     }
 
-    async componentDidMount() {
-        // this.onSyncUp();
+    switch = async () => {
+        // mark the current device as active
+        this.setState({
+            modalVisible: false
+        });
+        try {
+            const response = await fetch('http://192.168.86.105:3000/swap_device', {
+                method: 'POST',
+                body: JSON.stringify({
+                    exercise: this.state.exerciseInput,
+                    deviceId: Constants.installationId,
+                    lastDeviceId: this._lastDeviceId
+                }),
+                mode: 'cors',
+                cache: 'no-cache',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+            });
+            const state = await response.json();
+            if (state.succeeded) {
+                this.onSyncUp();
+            } else {
+                this.setState({
+                    modalVisible: true
+                });
+                this._lastDeviceId = state.lastDeviceId;
+            }
+        } catch (e) {
+            console.log(e.message);
+        }
+    }
+
+    noSwitch = () => {
+        this.onSyncUp();
+        this.setModalVisible(!this.state.modalVisible);
     }
 }

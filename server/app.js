@@ -38,22 +38,38 @@ app.post('/swap_device', async function(request, response) {
             UpdateExpression: `
               set exercises.#exercise = :completed, deviceId = :deviceId
             `,
+            ConditionExpression: 'deviceId = :lastDeviceId',
             ExpressionAttributeNames: {
                 '#exercise': request.body.exercise
             },
             ExpressionAttributeValues: {
                 ':completed': 'completed',
-                ':deviceId': request.body.deviceId 
+                ':deviceId': request.body.deviceId,
+                ':lastDeviceId': request.body.lastDeviceId
             },
-            ReturnValues: "UPDATED_NEW"
+            ReturnValues: "NONE"
         }).promise();
         response.json({
             succeeded: true
         });
-    } catch (e) {
-        response.json({
-            succeeded: false
-        });
+    } catch (err) {
+        if (err.code === 'ConditionalCheckFailedException') {
+            const resp = await dynamoClient.get({
+                TableName: 'ct152',
+                Key: {
+                    pk: 'userId#1'
+                },
+                AttributesToGet: [ 'deviceId' ]
+            }).promise();
+            response.json({
+                succeeded: false,
+                lastDeviceId: resp.Item.deviceId
+            });
+        } else {
+            response.json({
+                succeeded: false
+            })
+        }
     }
 });
 
@@ -75,16 +91,24 @@ app.post('/operation', async function(request, response){
                 ':completed': 'completed',
                 ':deviceId': request.body.deviceId 
             },
-            ReturnValues: "NONE"
+            ReturnValues: "UPDATED_OLD"
         }).promise();
         response.json({
             succeeded: true
         });
     } catch (err) {
         if (err.code === 'ConditionalCheckFailedException') {
-            console.log('The device is not active, ask to log in first');
+            const resp = await dynamoClient.get({
+                TableName: 'ct152',
+                Key: {
+                    pk: 'userId#1'
+                },
+                AttributesToGet: [ 'deviceId' ],
+                ConsistentRead: true
+            }).promise();
             response.json({
-                succeeded: false
+                succeeded: false,
+                lastDeviceId: resp.Item.deviceId
             });
         }
     }
