@@ -10,12 +10,19 @@
 #     "version": 3
 # }
 
-POST http://localhost:3000/operation HTTP/1.1
+# POST http://localhost:3000/operation HTTP/1.1
+# Content-Type: application/json
+
+# {
+#     "exercise": "1",
+#     "deviceId": "1"
+# }
+
+POST http://localhost:3000/swap_device HTTP/1.1
 Content-Type: application/json
 
 {
-    "exercise": 1,
-    "version": 1
+    "exercise": "1",
+    "deviceId": "1",
+    "lastDeviceId": "527DABDC-91C7-44E1-A6CF-A0FC18B55F83"
 }
-
-# "{"operation": "add","delta": 100,"version": 1}"
